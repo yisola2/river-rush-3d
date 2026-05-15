@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+riverush/node_modules/
+
+# Build outputs
+dist/
+riverush/dist/
+
+# Vendor
+vendor/
+riverush/vendor/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+.vscode/
+.idea/
