@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>River Rush 3D</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+  </head>
+  <body>
+    <canvas id="gameCanvas"></canvas>
+
+    <main class="hud" aria-label="Interface du jeu">
+      <section class="topbar">
+        <button id="settingsToggle" class="icon-button settings-toggle" type="button" aria-label="Masquer les reglages" title="Masquer les reglages">☰</button>
+        <div class="game-title">
+          <strong>River Rush 3D</strong>
+          <span>Dodge, jump, duck, collect</span>
+        </div>
+        <div>
+          <p class="label">Mode</p>
+          <div class="segmented" role="group" aria-label="Choisir la modalite">
+            <button class="mode-button" data-mode="motion">Motion</button>
+            <button class="mode-button active" data-mode="keyboard">Keyboard</button>
+            <button class="mode-button" data-mode="bot">Bot</button>
+          </div>
+        </div>
+        <div class="stat">
+          <span class="label">Score</span>
+          <strong id="score">0</strong>
+        </div>
+        <div class="stat">
+          <span class="label">Etat</span>
+          <strong id="state">Run</strong>
+        </div>
+        <button id="restartButton" class="icon-button" type="button" aria-label="Recommencer" title="Recommencer">↻</button>
+      </section>
+
+      <section class="status-panel" aria-label="Etat du joueur">
+        <div class="lean-status">
+          <p class="label">Lean</p>
+          <div class="lean-track">
+            <span class="lean-center"></span>
+            <span id="leanMarker" class="lean-marker"></span>
+          </div>
+        </div>
+        <div class="gesture-status">
+          <span id="jumpCue">Jump</span>
+          <span id="duckCue">Duck</span>
+          <span id="collectCue">Stars</span>
+        </div>
+      </section>
+
+      <section class="help-panel" aria-label="Aide et debug">
+        <div>
+          <p class="label">Controls</p>
+          <div class="legend">
+            <span><kbd>Q</kbd>/<kbd>A</kbd><kbd>D</kbd> lean</span>
+            <span><kbd>Z</kbd>/<kbd>W</kbd><kbd>Space</kbd> jump</span>
+            <span><kbd>S</kbd> duck</span>
+            <span><kbd>M</kbd> motion</span>
+            <span><kbd>B</kbd> bot</span>
+            <span><kbd>R</kbd> restart</span>
+          </div>
+        </div>
+        <div>
+          <p class="label">Debug</p>
+          <div class="legend">
+            <span><kbd>H</kbd> hitboxes</span>
+            <span><kbd>I</kbd> Babylon inspector</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="build-panel" aria-label="Elements implementes">
+        <p class="label">Built so far</p>
+        <div class="build-list">
+          <span>3D river scene</span>
+          <span>Motion-style controls</span>
+          <span>Steering bot</span>
+          <span>Readable obstacles</span>
+          <span>CC0 scenery assets</span>
+        </div>
+      </section>
+
+      <section class="motion-panel hidden" aria-hidden="true">
+        <div class="lean-track">
+          <span class="lean-center"></span>
+          <span class="lean-marker"></span>
+        </div>
+      </section>
+
+      <section class="behaviours" aria-label="Steering behaviours actifs">
+        <p class="label">Steering behaviours</p>
+        <div class="behaviour-list">
+          <span id="seekTag">Seek forward</span>
+          <span id="arriveTag">Jump/Duck</span>
+          <span id="fleeTag">Bank guard</span>
+          <span id="avoidTag">Avoid obstacles</span>
+          <span id="wanderTag">Sensors</span>
+        </div>
+      </section>
+    </main>
+
+    <div id="message" class="message hidden">
+      <strong>Collision</strong>
+      <span>Recommence ou passe en bot pour tester les steering behaviours.</span>
+    </div>
+
+    <script type="module" src="./dist/game.js"></script>
+  </body>
+</html>

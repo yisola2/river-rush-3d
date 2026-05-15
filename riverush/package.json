@@ -1,0 +1,13 @@
+{
+  "name": "river-rush-3d",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npm run build && node scripts/start.mjs",
+    "build": "tsc && node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
