@@ -13,6 +13,117 @@ import type { AssetLoader } from "./assets.js";
 
 declare const BABYLON: any;
 
+type WaveItem = {
+  type: string;
+  lane: number;
+  zOffset: number;
+  jitter?: number;
+};
+
+type WavePattern = {
+  name: string;
+  minDistance: number;
+  delay: number;
+  weight: number;
+  items: WaveItem[];
+};
+
+const WAVE_PATTERNS: WavePattern[] = [
+  {
+    name: "intro-rock-side-star-center",
+    minDistance: 0,
+    delay: 1.18,
+    weight: 3,
+    items: [
+      { type: OBSTACLE_TYPES.ROCK, lane: -1, zOffset: 0, jitter: 0.1 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 3.1 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 4.15 },
+    ],
+  },
+  {
+    name: "intro-rock-other-side",
+    minDistance: 20,
+    delay: 1.12,
+    weight: 3,
+    items: [
+      { type: OBSTACLE_TYPES.ROCK, lane: 1, zOffset: 0, jitter: 0.1 },
+      { type: OBSTACLE_TYPES.STAR, lane: -1, zOffset: 3.3 },
+      { type: OBSTACLE_TYPES.STAR, lane: -1, zOffset: 4.35 },
+    ],
+  },
+  {
+    name: "collectible-arc",
+    minDistance: 55,
+    delay: 1.04,
+    weight: 2.4,
+    items: [
+      { type: OBSTACLE_TYPES.STAR, lane: -1, zOffset: 0 },
+      { type: OBSTACLE_TYPES.STAR, lane: -0.5, zOffset: 1.0 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 2.0 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0.5, zOffset: 3.0 },
+      { type: OBSTACLE_TYPES.STAR, lane: 1, zOffset: 4.0 },
+    ],
+  },
+  {
+    name: "duck-log-center",
+    minDistance: 95,
+    delay: 1.22,
+    weight: 2,
+    items: [
+      { type: OBSTACLE_TYPES.LOG, lane: 0, zOffset: 0 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 3.6 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 4.7 },
+    ],
+  },
+  {
+    name: "jump-gate-reward",
+    minDistance: 135,
+    delay: 1.34,
+    weight: 1.8,
+    items: [
+      { type: OBSTACLE_TYPES.JUMP_GATE, lane: 0, zOffset: 0 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 3.7 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 4.8 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 5.9 },
+    ],
+  },
+  {
+    name: "two-hazards-center-safe",
+    minDistance: 190,
+    delay: 1.28,
+    weight: 2.1,
+    items: [
+      { type: OBSTACLE_TYPES.ROCK, lane: -1, zOffset: 0, jitter: 0.08 },
+      { type: OBSTACLE_TYPES.LOG, lane: 1, zOffset: 2.4, jitter: 0.08 },
+      { type: OBSTACLE_TYPES.STAR, lane: 0, zOffset: 4.4 },
+    ],
+  },
+  {
+    name: "choice-left-right",
+    minDistance: 260,
+    delay: 1.36,
+    weight: 1.8,
+    items: [
+      { type: OBSTACLE_TYPES.ROCK, lane: -2, zOffset: 0, jitter: 0.08 },
+      { type: OBSTACLE_TYPES.ROCK, lane: 0, zOffset: 0.8, jitter: 0.08 },
+      { type: OBSTACLE_TYPES.STAR, lane: 1, zOffset: 3.8 },
+      { type: OBSTACLE_TYPES.STAR, lane: 2, zOffset: 5.0 },
+    ],
+  },
+  {
+    name: "jump-duck-combo",
+    minDistance: 340,
+    delay: 1.52,
+    weight: 1.3,
+    items: [
+      { type: OBSTACLE_TYPES.JUMP_GATE, lane: 0, zOffset: 0 },
+      { type: OBSTACLE_TYPES.LOG, lane: 0, zOffset: 7.0 },
+      { type: OBSTACLE_TYPES.STAR, lane: -1, zOffset: 6.2 },
+      { type: OBSTACLE_TYPES.STAR, lane: 1, zOffset: 6.2 },
+    ],
+  },
+];
+
 export class ObstacleSystem {
   obstacles = [];
   private serial = 0;
@@ -28,32 +139,16 @@ export class ObstacleSystem {
 
   spawnWave(distance: number) {
     const difficulty = Math.min(1, distance / 650);
-    const nextDelay = 0.98 - difficulty * 0.22 + Math.random() * 0.4;
-    const roll = Math.random();
+    const pattern = this.pickWavePattern(distance);
+    const mirror = Math.random() < 0.5 ? -1 : 1;
 
-    if (roll < 0.16 + difficulty * 0.08) {
-      this.spawn(OBSTACLE_TYPES.JUMP_GATE, 0, SPAWN_Z);
-      this.spawnTokens(0, SPAWN_Z + 3.4);
-      return nextDelay;
+    for (const item of pattern.items) {
+      const lane = this.resolvePatternLane(item.lane, mirror);
+      const jitter = item.jitter ? (Math.random() - 0.5) * item.jitter * 2 : 0;
+      this.spawn(item.type, lane + jitter, SPAWN_Z + item.zOffset);
     }
 
-    if (roll > 0.82) {
-      this.spawnTokenArc(SPAWN_Z);
-      return nextDelay;
-    }
-
-    const count = roll > 0.64 ? 2 : 1;
-    const keepCenterOpen = distance < 120 || count === 1;
-    const available = keepCenterOpen ? LANES.filter((lane) => lane !== 0) : [...LANES];
-    for (let i = 0; i < count; i += 1) {
-      const laneIndex = Math.floor(Math.random() * available.length);
-      const lane = available.splice(laneIndex, 1)[0];
-      const x = lane + (Math.random() - 0.5) * 0.25;
-      const type = Math.random() < 0.58 ? OBSTACLE_TYPES.ROCK : OBSTACLE_TYPES.LOG;
-      this.spawn(type, x, SPAWN_Z + i * 2.5);
-    }
-    this.spawnTokens(LANES[Math.floor(Math.random() * LANES.length)], SPAWN_Z + 4.2);
-    return nextDelay;
+    return Math.max(0.78, pattern.delay - difficulty * 0.18 + Math.random() * 0.16);
   }
 
   update(dt: number, speed: number, distance: number) {
@@ -158,6 +253,26 @@ export class ObstacleSystem {
     for (const obstacle of this.obstacles) {
       if (obstacle.hitbox) obstacle.hitbox.setEnabled(this.showHitboxes);
     }
+  }
+
+  private pickWavePattern(distance: number) {
+    const available = WAVE_PATTERNS.filter((pattern) => distance >= pattern.minDistance);
+    const total = available.reduce((sum, pattern) => sum + pattern.weight, 0);
+    let roll = Math.random() * total;
+    for (const pattern of available) {
+      roll -= pattern.weight;
+      if (roll <= 0) return pattern;
+    }
+    return available[available.length - 1] ?? WAVE_PATTERNS[0];
+  }
+
+  private resolvePatternLane(laneIndex: number, mirror: number) {
+    const center = Math.floor(LANES.length / 2);
+    const rawIndex = BABYLON.Scalar.Clamp(center + laneIndex * mirror, 0, LANES.length - 1);
+    const lower = Math.floor(rawIndex);
+    const upper = Math.ceil(rawIndex);
+    const t = rawIndex - lower;
+    return LANES[lower] + (LANES[upper] - LANES[lower]) * t;
   }
 
   private spawnTokens(x: number, z: number) {

@@ -9,6 +9,10 @@ export class Raft {
   leftArm;
   rightArm;
   wake;
+  modelRoot;
+  animationGroups = new Map<string, any>();
+  private activeAnimation = "";
+  private lastZState = "NORMAL";
 
   constructor(private scene, private materials) {}
 
@@ -24,6 +28,54 @@ export class Raft {
     this.createWake();
   }
 
+  async loadModel() {
+    try {
+      const result = await BABYLON.SceneLoader.ImportMeshAsync("", "./assets/models/", "rider_mixamo.glb", this.scene);
+      this.modelRoot = new BABYLON.TransformNode("mixamoRiderRoot", this.scene);
+      this.modelRoot.parent = this.body;
+      this.modelRoot.position.set(0, 0.16, 0.16);
+      this.modelRoot.rotation.y = 0;
+      this.modelRoot.scaling.setAll(0.74);
+
+      const importedRoot = result.meshes.find((mesh) => mesh.name === "__root__") ?? result.meshes[0];
+      if (importedRoot) importedRoot.parent = this.modelRoot;
+
+      result.meshes.forEach((mesh) => {
+        mesh.isPickable = false;
+        mesh.visibility = 1;
+        if (mesh.material) this.makeImportedMaterialReadable(mesh.material);
+      });
+
+      for (const group of result.animationGroups) {
+        this.animationGroups.set(group.name.toLowerCase(), group);
+        group.stop();
+      }
+
+      this.rider.setEnabled(false);
+      this.playAnimation("idle", true);
+      console.info("Loaded Mixamo rider", [...this.animationGroups.keys()]);
+    } catch (error) {
+      console.warn("Could not load Mixamo rider, using procedural rider", error);
+    }
+  }
+
+  setRiderColor(color) {
+    this.materials.rider.diffuseColor = color;
+    this.materials.rider.emissiveColor = color.scale(0.14);
+  }
+
+  private makeImportedMaterialReadable(material) {
+    if (material.subMaterials) {
+      material.subMaterials.forEach((sub) => sub && this.makeImportedMaterialReadable(sub));
+      return;
+    }
+    const name = material.name?.toLowerCase?.() ?? "";
+    const isLens = name.includes("lens");
+    material.alpha = isLens ? 0.42 : 1;
+    material.transparencyMode = isLens ? BABYLON.Material.MATERIAL_ALPHABLEND : BABYLON.Material.MATERIAL_OPAQUE;
+    material.backFaceCulling = false;
+  }
+
   reset() {
     this.root.position.set(0, 0.42, RAFT_Z);
     this.body.rotation.set(0, 0, 0);
@@ -34,6 +86,7 @@ export class Raft {
   }
 
   animate({ distance, zState, zTimer, activeVelocity, motionLean, camera, fixedCameraTarget }) {
+    this.updateModelAnimation(zState);
     const jumpProgress = zState === "JUMPING" ? Math.sin((zTimer / 0.66) * Math.PI) : 0;
     this.root.position.y = 0.42 + jumpProgress * 1.65;
     this.body.scaling.y = zState === "DUCKING" ? 0.58 : 1;
@@ -55,6 +108,40 @@ export class Raft {
       } else {
         this.wake.emitRate = 0;
       }
+    }
+  }
+
+  private updateModelAnimation(zState: string) {
+    if (!this.modelRoot || zState === this.lastZState) return;
+    this.lastZState = zState;
+    if (zState === "JUMPING") {
+      this.playAnimation("jump", false, 1.85, () => this.playAnimation("idle", true));
+      return;
+    }
+    if (zState === "DUCKING") {
+      this.playAnimation("crouch_idle", true);
+      return;
+    }
+    // Do not cut the non-looping jump animation the moment gameplay returns
+    // to NORMAL; let its onEnd callback blend back to idle.
+    if (this.activeAnimation.startsWith("jump:")) return;
+    this.playAnimation("idle", true);
+  }
+
+  private playAnimation(name: string, loop: boolean, speed = 1, onEnd?: () => void) {
+    const key = name.toLowerCase();
+    const group = this.animationGroups.get(key) ?? [...this.animationGroups.entries()].find(([groupName]) => groupName.includes(key))?.[1];
+    if (!group || this.activeAnimation === `${name}:${loop}`) return;
+    for (const anim of this.animationGroups.values()) anim.stop();
+    this.activeAnimation = `${name}:${loop}`;
+    group.speedRatio = speed;
+    group.reset();
+    group.start(loop);
+    if (onEnd) {
+      const observer = group.onAnimationGroupEndObservable.add(() => {
+        group.onAnimationGroupEndObservable.remove(observer);
+        onEnd();
+      });
     }
   }
 

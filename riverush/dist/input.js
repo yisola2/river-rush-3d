@@ -39,10 +39,14 @@ export class InputController {
             this.callbacks.setMode(this.callbacks.getMode() === "motion" ? "keyboard" : "motion");
         if (key === "b")
             this.callbacks.setMode(this.callbacks.getMode() === "bot" ? "keyboard" : "bot");
+        if (key === "c")
+            this.callbacks.setMode(this.callbacks.getMode() === "camera" ? "keyboard" : "camera");
         if (key === "r")
             this.callbacks.restart();
         if (key === "h")
             this.callbacks.toggleHitboxes();
+        if (event.key === "Escape")
+            this.callbacks.toggleMenu();
         if (this.isJumpKey(event))
             this.callbacks.jump();
         if (this.isDuckKey(event))

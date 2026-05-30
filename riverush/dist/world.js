@@ -25,6 +25,7 @@ export class World {
         this.river.receiveShadows = true;
         this.createDistantBanks();
         this.createBankEdges();
+        this.createBankIrregularities();
         this.createScenery();
         this.createFoam();
         // Populate WaterMaterial renderList for reflections
@@ -73,6 +74,38 @@ export class World {
             rail.rotation.x = Math.PI / 2;
             rail.position.set(x, 0.18, 2);
             rail.material = this.materials.cliff;
+        }
+    }
+    createBankIrregularities() {
+        // Visual-only shoreline chunks. They do not affect gameplay bounds, but
+        // break the straight rectangular river silhouette and make the course feel
+        // more hand-built/natural.
+        for (let i = 0; i < 34; i += 1) {
+            const side = i % 2 === 0 ? -1 : 1;
+            const z = -21 + i * 1.28;
+            const width = 0.55 + (i % 4) * 0.22;
+            const depth = 0.85 + (i % 5) * 0.28;
+            const patch = BABYLON.MeshBuilder.CreateBox(`shorePatch${i}`, {
+                width,
+                height: 0.12,
+                depth,
+            }, this.scene);
+            patch.position.set(side * (RIVER_HALF_WIDTH + 0.22 + width * 0.32), 0.075, z);
+            patch.rotation.y = side * (0.18 + (i % 3) * 0.06);
+            patch.material = i % 3 === 0 ? this.materials.bank : this.materials.cliff;
+            patch.metadata = { baseZ: z, speed: 7 };
+            if (i % 3 === 0) {
+                const reed = BABYLON.MeshBuilder.CreateCylinder(`shoreReed${i}`, {
+                    diameterTop: 0.02,
+                    diameterBottom: 0.05,
+                    height: 0.72,
+                    tessellation: 5,
+                }, this.scene);
+                reed.position.set(side * (RIVER_HALF_WIDTH + 0.08), 0.42, z + 0.18);
+                reed.rotation.z = -side * 0.22;
+                reed.material = this.materials.leaf;
+                reed.metadata = { baseZ: z + 0.18, speed: 7 };
+            }
         }
     }
     createDistantBanks() {

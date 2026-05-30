@@ -8,108 +8,78 @@
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
     <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
   </head>
   <body>
     <canvas id="gameCanvas"></canvas>
 
-    <main class="hud" aria-label="Interface du jeu">
-      <section class="topbar">
-        <button id="settingsToggle" class="icon-button settings-toggle" type="button" aria-label="Masquer les reglages" title="Masquer les reglages">☰</button>
-        <div class="game-title">
-          <strong>River Rush 3D</strong>
-          <span>Dodge, jump, duck, collect</span>
-        </div>
-        <div>
-          <p class="label">Mode</p>
-          <div class="segmented" role="group" aria-label="Choisir la modalite">
-            <button class="mode-button" data-mode="motion">Motion</button>
-            <button class="mode-button active" data-mode="keyboard">Keyboard</button>
-            <button class="mode-button" data-mode="bot">Bot</button>
+    <div id="htmlMenu" class="menu-overlay">
+      <div class="menu-band menu-band-top"></div>
+      <div class="menu-band menu-band-bottom"></div>
+      <div class="leaf leaf-a"></div>
+      <div class="leaf leaf-b"></div>
+      <header class="menu-hero">
+        <p class="eyebrow">Games on Web · Kinect-style adventure</p>
+        <h1>River Rush 3D</h1>
+        <p id="menuSubtitle">Choose your rider and jump into the river.</p>
+      </header>
+      <main class="menu-cards">
+        <section class="stone-card adventure-card">
+          <span class="card-kicker">01</span>
+          <h2>Adventure</h2>
+          <p>Ride the rapids, dodge hazards, collect stars.</p>
+          <button id="playButton" class="craft-button primary">Play River Rush</button>
+          <button id="restartMenuButton" class="craft-button">Restart run</button>
+        </section>
+
+        <section class="stone-card">
+          <span class="card-kicker">02</span>
+          <h2>Rider</h2>
+          <p>Local profile and best score.</p>
+          <div class="choice-stack" data-choice-group="profile">
+            <button class="chip-button" data-profile="Guest">Guest</button>
+            <button class="chip-button" data-profile="Player 1">Player 1</button>
+            <button class="chip-button" data-profile="Player 2">Player 2</button>
           </div>
-        </div>
-        <div class="stat">
-          <span class="label">Score</span>
-          <strong id="score">0</strong>
-        </div>
-        <div class="stat">
-          <span class="label">Etat</span>
-          <strong id="state">Run</strong>
-        </div>
-        <button id="restartButton" class="icon-button" type="button" aria-label="Recommencer" title="Recommencer">↻</button>
-      </section>
-
-      <section class="status-panel" aria-label="Etat du joueur">
-        <div class="lean-status">
-          <p class="label">Lean</p>
-          <div class="lean-track">
-            <span class="lean-center"></span>
-            <span id="leanMarker" class="lean-marker"></span>
+          <div class="rider-preview" aria-hidden="true">
+            <span class="rider-head"></span>
+            <span class="rider-body"></span>
+            <span class="rider-raft"></span>
           </div>
-        </div>
-        <div class="gesture-status">
-          <span id="jumpCue">Jump</span>
-          <span id="duckCue">Duck</span>
-          <span id="collectCue">Stars</span>
-        </div>
-      </section>
+          <div class="profile-badge"><span id="menuProfile">Guest</span><strong id="menuBest">Best 0</strong></div>
+        </section>
 
-      <section class="help-panel" aria-label="Aide et debug">
-        <div>
-          <p class="label">Controls</p>
-          <div class="legend">
-            <span><kbd>Q</kbd>/<kbd>A</kbd><kbd>D</kbd> lean</span>
-            <span><kbd>Z</kbd>/<kbd>W</kbd><kbd>Space</kbd> jump</span>
-            <span><kbd>S</kbd> duck</span>
-            <span><kbd>M</kbd> motion</span>
-            <span><kbd>B</kbd> bot</span>
-            <span><kbd>R</kbd> restart</span>
+        <section class="stone-card">
+          <span class="card-kicker">03</span>
+          <h2>Controls</h2>
+          <p>Pick a control style for this run.</p>
+          <div class="choice-stack" data-choice-group="mode">
+            <button class="chip-button" data-mode="keyboard">Keyboard</button>
+            <button class="chip-button" data-mode="motion">Motion</button>
+            <button class="chip-button" data-mode="bot">Bot</button>
+            <button class="chip-button" data-mode="camera">Camera</button>
           </div>
-        </div>
-        <div>
-          <p class="label">Debug</p>
-          <div class="legend">
-            <span><kbd>H</kbd> hitboxes</span>
-            <span><kbd>I</kbd> Babylon inspector</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="build-panel" aria-label="Elements implementes">
-        <p class="label">Built so far</p>
-        <div class="build-list">
-          <span>3D river scene</span>
-          <span>Motion-style controls</span>
-          <span>Steering bot</span>
-          <span>Readable obstacles</span>
-          <span>CC0 scenery assets</span>
-        </div>
-      </section>
-
-      <section class="motion-panel hidden" aria-hidden="true">
-        <div class="lean-track">
-          <span class="lean-center"></span>
-          <span class="lean-marker"></span>
-        </div>
-      </section>
-
-      <section class="behaviours" aria-label="Steering behaviours actifs">
-        <p class="label">Steering behaviours</p>
-        <div class="behaviour-list">
-          <span id="seekTag">Seek forward</span>
-          <span id="arriveTag">Jump/Duck</span>
-          <span id="fleeTag">Bank guard</span>
-          <span id="avoidTag">Avoid obstacles</span>
-          <span id="wanderTag">Sensors</span>
-        </div>
-      </section>
-    </main>
-
-    <div id="message" class="message hidden">
-      <strong>Collision</strong>
-      <span>Recommence ou passe en bot pour tester les steering behaviours.</span>
+          <p class="tiny-help">Q/A/D lean · Space jump · S duck · C camera</p>
+        </section>
+      </main>
+      <footer class="menu-footer">Esc/☰ pause · H hitboxes · I inspector · Camera mode coming next</footer>
     </div>
 
-    <script type="module" src="./game.js"></script>
+    <script type="module">
+      const waitForBabylon = async () => {
+        for (let i = 0; i < 80; i += 1) {
+          if (window.BABYLON) return true;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return false;
+      };
+
+      if (await waitForBabylon()) {
+        import("./game.js");
+      } else {
+        console.error("BabylonJS did not load. Check network/CDN access.");
+      }
+    </script>
   </body>
 </html>
