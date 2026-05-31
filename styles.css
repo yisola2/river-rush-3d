@@ -1,0 +1,412 @@
+:root {
+  color-scheme: dark;
+  --ink: #fae69f;
+  --muted: #d9cfa6;
+  --deep: #0b1718;
+  --leaf: #172720;
+  --leaf-2: #21372d;
+  --stone: rgba(34, 46, 39, 0.88);
+  --stone-line: rgba(250, 230, 159, 0.55);
+  --gold: #feb941;
+  --aqua: #67e8bd;
+  --player-color: rgb(48, 214, 171);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #091011;
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Gill Sans", system-ui, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+  touch-action: none;
+}
+
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  place-items: center;
+  padding: clamp(18px, 3vw, 42px);
+  background:
+    radial-gradient(circle at 18% 78%, rgba(103, 232, 189, 0.12), transparent 28%),
+    radial-gradient(circle at 82% 24%, rgba(254, 185, 65, 0.12), transparent 26%),
+    linear-gradient(rgba(8, 18, 18, 0.62), rgba(8, 18, 18, 0.44));
+  backdrop-filter: blur(2px) saturate(0.8);
+}
+
+.menu-overlay.hidden {
+  display: none;
+}
+
+.menu-band {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.menu-band-top {
+  top: 0;
+  height: 11vh;
+}
+
+.menu-band-bottom {
+  bottom: 0;
+  height: 10vh;
+}
+
+.leaf {
+  position: absolute;
+  width: 220px;
+  height: 90px;
+  border-radius: 60% 12% 60% 12%;
+  background: linear-gradient(135deg, rgba(49, 90, 63, 0.45), rgba(11, 23, 24, 0.02));
+  border: 1px solid rgba(250, 230, 159, 0.08);
+  pointer-events: none;
+}
+
+.leaf-a {
+  left: -42px;
+  bottom: 12vh;
+  transform: rotate(-18deg);
+}
+
+.leaf-b {
+  right: -38px;
+  top: 16vh;
+  transform: rotate(162deg);
+}
+
+.menu-hero {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  align-self: start;
+  padding-top: 2vh;
+  text-shadow: #003733 3px 3px 1px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--aqua);
+  font-size: clamp(12px, 1.2vw, 16px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.menu-hero h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(48px, 6vw, 92px);
+  line-height: 0.92;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+}
+
+.menu-hero p:not(.eyebrow) {
+  margin: 12px 0 0;
+  color: #f7e9b8;
+  font-size: clamp(16px, 1.5vw, 22px);
+  font-weight: 800;
+}
+
+.menu-cards {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(230px, 320px));
+  gap: clamp(18px, 2.2vw, 34px);
+  align-self: center;
+  width: min(1100px, 92vw);
+  justify-content: center;
+}
+
+.stone-card {
+  position: relative;
+  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border: 3px solid var(--stone-line);
+  border-radius: 34px 24px 38px 22px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), transparent 34%),
+    radial-gradient(circle at 20% 0%, rgba(254, 185, 65, 0.08), transparent 35%),
+    var(--stone);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -18px 32px rgba(0, 0, 0, 0.18),
+    0 28px 80px rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+}
+
+.stone-card::before,
+.stone-card::after {
+  content: "";
+  position: absolute;
+  background: rgba(250, 230, 159, 0.08);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.stone-card::before {
+  width: 120px;
+  height: 12px;
+  left: 22px;
+  top: 18px;
+  transform: rotate(-2deg);
+}
+
+.stone-card::after {
+  width: 80px;
+  height: 10px;
+  right: -14px;
+  bottom: 40px;
+  transform: rotate(-24deg);
+}
+
+.adventure-card {
+  transform: translateY(-16px);
+}
+
+.card-kicker {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(254, 185, 65, 0.16);
+  border: 2px solid rgba(254, 185, 65, 0.45);
+  color: var(--gold);
+  font-weight: 900;
+}
+
+.stone-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 34px;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  text-shadow: #003733 2px 2px 1px;
+}
+
+.stone-card p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.craft-button,
+.chip-button {
+  min-height: 52px;
+  border: 2px solid rgba(250, 230, 159, 0.65);
+  border-radius: 16px 12px 18px 12px;
+  color: var(--ink);
+  background: #334345;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  font-weight: 900;
+  text-shadow: #003733 1px 1px 1px;
+  transition: transform 0.14s ease, filter 0.14s ease, background 0.14s ease;
+}
+
+.craft-button:hover,
+.chip-button:hover {
+  transform: translateY(2px) scale(0.985);
+  filter: brightness(1.08);
+}
+
+.craft-button.primary,
+.chip-button.active {
+  color: #102022;
+  background: var(--gold);
+  text-shadow: none;
+}
+
+.choice-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-avatar {
+  width: 100%;
+  max-height: 170px;
+  object-fit: cover;
+  object-position: 50% 18%;
+  border: 1px solid rgba(250, 230, 159, 0.22);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 72%, rgba(103, 232, 189, 0.18), transparent 42%),
+    rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 -10px 0 rgba(0, 0, 0, 0.12);
+}
+
+.profile-badge {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(250, 230, 159, 0.26);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.profile-badge strong {
+  color: var(--gold);
+}
+
+.tiny-help {
+  margin-top: auto !important;
+  font-size: 13px;
+}
+
+.menu-footer {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  color: var(--ink);
+  font-size: clamp(14px, 1.2vw, 18px);
+  font-weight: 900;
+  text-align: center;
+  text-shadow: #003733 2px 2px 1px;
+}
+
+@media (max-width: 860px) {
+  .menu-overlay {
+    overflow: auto;
+    justify-content: start;
+  }
+
+  .menu-cards {
+    grid-template-columns: 1fr;
+    width: min(420px, 92vw);
+    padding: 24px 0 110px;
+  }
+
+  .adventure-card {
+    transform: none;
+  }
+
+  .stone-card {
+    min-height: auto;
+  }
+}
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(103, 232, 189, 0.16), transparent 30%),
+    radial-gradient(circle at 18% 78%, rgba(254, 185, 65, 0.12), transparent 28%),
+    linear-gradient(140deg, rgba(8, 18, 18, 0.96), rgba(12, 31, 31, 0.94));
+}
+
+.welcome-overlay.hidden {
+  display: none;
+}
+
+.welcome-card {
+  width: min(620px, 92vw);
+  min-height: 620px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 18px;
+  padding: clamp(28px, 5vw, 54px);
+  border: 4px solid var(--stone-line);
+  border-radius: 42px 28px 46px 30px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), transparent 34%),
+    radial-gradient(circle at 22% 0%, rgba(254, 185, 65, 0.1), transparent 35%),
+    rgba(34, 46, 39, 0.9);
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.52), inset 0 -20px 40px rgba(0, 0, 0, 0.16);
+  text-align: center;
+}
+
+.welcome-card h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(54px, 8vw, 96px);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  text-shadow: #003733 3px 3px 1px;
+}
+
+.welcome-card p {
+  max-width: 430px;
+  margin: 0;
+  color: #f7e9b8;
+  font-size: clamp(16px, 1.8vw, 21px);
+  font-weight: 900;
+}
+
+.welcome-card small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.welcome-avatar {
+  width: min(310px, 70vw);
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: 50% 18%;
+  border: 4px solid rgba(250, 230, 159, 0.65);
+  border-radius: 36px 24px 40px 24px;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.38),
+    0 0 0 10px rgba(103, 232, 189, 0.08);
+}
+
+.steering-debug {
+  position: fixed;
+  right: 18px;
+  top: 18px;
+  z-index: 12;
+  width: 310px;
+  padding: 14px 16px;
+  border: 2px solid rgba(250, 230, 159, 0.62);
+  border-radius: 18px;
+  background: rgba(8, 18, 18, 0.82);
+  color: #f7e9b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+.steering-debug.hidden {
+  display: none;
+}
