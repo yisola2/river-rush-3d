@@ -12,9 +12,10 @@ J’ai choisi cette idée parce qu’elle me rappelle beaucoup mon enfance : les
 
 ## Jouer au jeu
 
-Liens à compléter après déploiement :
+Liens :
 
-- Version web : https://yisola2.itch.io/river-rush-3d
+- Jeu web GitHub Pages : https://yisola2.github.io/river-rush-3d/
+- Itch.io : https://yisola2.itch.io/river-rush-3d
 - Vidéo YouTube : https://youtu.be/ggPOP_gAf3U
 
 Le jeu fonctionne directement dans un navigateur moderne. Aucun gamepad n’est nécessaire.

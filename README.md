@@ -12,6 +12,7 @@ riverush/
 
 ## Liens
 
+- Jeu web GitHub Pages : https://yisola2.github.io/river-rush-3d/
 - Itch.io : https://yisola2.itch.io/river-rush-3d
 - Vidéo YouTube : https://youtu.be/ggPOP_gAf3U
 
