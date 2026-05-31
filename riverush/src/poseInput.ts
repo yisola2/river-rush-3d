@@ -196,8 +196,12 @@ export class PoseInputController {
     }
 
     // Mirror the webcam: leaning screen-left should move raft left.
-    const rawLean = BABYLON.Scalar.Clamp((this.neutralCenterX - bodyCenterX) * 6.2, -1, 1);
-    this.leanSmoothed = BABYLON.Scalar.Lerp(this.leanSmoothed, rawLean, 0.32);
+    // High gain makes small real-world leans readable without needing to bend far.
+    const leanDelta = this.neutralCenterX - bodyCenterX;
+    const deadZone = 0.012;
+    const adjustedLean = Math.sign(leanDelta) * Math.max(0, Math.abs(leanDelta) - deadZone);
+    const rawLean = BABYLON.Scalar.Clamp(adjustedLean * 11.5, -0.88, 0.88);
+    this.leanSmoothed = BABYLON.Scalar.Lerp(this.leanSmoothed, rawLean, 0.42);
     this.state.lean = this.leanSmoothed;
 
     const bodyCenterY = (shoulderCenterY + hipCenterY) * 0.5;

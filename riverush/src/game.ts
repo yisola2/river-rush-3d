@@ -1,4 +1,5 @@
 import {
+  JUMP_DURATION,
   LANES,
   OBSTACLE_TYPES,
   PLAYER_RADIUS,
@@ -9,6 +10,7 @@ import {
   STEERING_CONFIG,
 } from "./constants.js";
 import { AssetLoader } from "./assets.js";
+import { audio } from "./audio.js";
 import { InputController } from "./input.js";
 import { installBabylonDebug } from "./debug.js";
 import { createGameMaterials } from "./materials.js";
@@ -41,11 +43,15 @@ let poseInput: PoseInputController;
 let ui: UiController;
 let botVehicle;
 let sensorLines = [];
+let debugTargetMarker;
+let debugMode = false;
+let latestSteeringPlan = null;
+let latestSensorReadings = [];
 
 let mode = "keyboard";
 let phase = "menu";
 let countdown = 0;
-let profile = localStorage.getItem("riverRushProfile") || "Guest";
+let profile = "Guest";
 let score = 0;
 let distance = 0;
 let crashed = false;
@@ -140,13 +146,23 @@ function createSensors() {
     line.visibility = 0;
     return line;
   });
+
+  debugTargetMarker = BABYLON.MeshBuilder.CreateTorus("debugTargetMarker", {
+    diameter: 0.72,
+    thickness: 0.055,
+    tessellation: 28,
+  }, scene);
+  debugTargetMarker.rotation.x = Math.PI / 2;
+  debugTargetMarker.position.y = 0.18;
+  debugTargetMarker.material = materials.sensor;
+  debugTargetMarker.visibility = 0;
 }
 
 function update() {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.033);
   world.update(dt);
 
-  if (mode === "camera" && phase === "menu") {
+  if (mode === "camera" && (phase === "menu" || phase === "crashed")) {
     const pose = poseInput.update();
     if (pose.clapIntent && poseInput.calibrateFromCurrentPose()) {
       restart();
@@ -169,12 +185,14 @@ function update() {
 
     updateZState(dt);
     if (mode === "keyboard") updateKeyboard(dt);
-    if (mode === "motion") updateMotion(dt);
     if (mode === "camera") updateCamera(dt);
     if (mode === "bot") updateBot(dt);
+    updateHeldKeyboardDuck();
 
     obstacleSystem.update(dt, getObstacleSpeed(), distance);
-    score += obstacleSystem.collectPassedScore();
+    const passedScore = obstacleSystem.collectPassedScore();
+    if (passedScore > 0) createPassEffect();
+    score += passedScore;
     checkCollisions();
   }
 
@@ -195,13 +213,18 @@ function updateKeyboard(dt: number) {
   keepRaftInRiver();
 }
 
+function updateHeldKeyboardDuck() {
+  if (mode === "keyboard" && input.isDuckPressed() && zState !== "JUMPING") {
+    holdDuckAction();
+  }
+}
+
 function updateCamera(dt: number) {
   const pose = poseInput.update();
   input.motionLean = pose.lean;
   if (pose.jumpIntent) startZAction("JUMPING");
   if (pose.duckHeld && zState !== "JUMPING") {
-    zState = "DUCKING";
-    zTimer = 0.16;
+    holdDuckAction();
   }
   updateLeanMovement(dt, pose.lean);
 }
@@ -239,6 +262,8 @@ function updateBot(dt: number) {
     obstacleSpeed: getObstacleSpeed(),
     zState,
   });
+  latestSteeringPlan = steeringPlan;
+  latestSensorReadings = readings;
 
   botVehicle.behaviors.update({ readings, obstacles: obstacleSystem.obstacles, targetLane: steeringPlan.targetX, hasThreat: steeringPlan.hasThreat, steeringPlan }, dt);
 
@@ -263,14 +288,22 @@ function updateZState(dt: number) {
     zState = "NORMAL";
     zTimer = 0;
     if (previousState === "JUMPING") createSplashEffect();
+    if (previousState === "DUCKING") audio.playDuckExit();
   }
+}
+
+function holdDuckAction() {
+  if (zState !== "DUCKING") createDuckEffect();
+  zState = "DUCKING";
+  zTimer = 0.16;
 }
 
 function startZAction(nextState: string) {
   if (zState !== "NORMAL") return;
   zState = nextState;
-  zTimer = nextState === "DUCKING" ? 0.78 : 0.66;
+  zTimer = nextState === "DUCKING" ? 0.78 : JUMP_DURATION;
   if (nextState === "JUMPING") createSplashEffect();
+  if (nextState === "DUCKING") createDuckEffect();
 }
 
 function getObstacleSpeed() {
@@ -305,38 +338,153 @@ function createOneShotParticles(name: string, position, color1, color2, options 
 }
 
 function createCollectEffect() {
+  audio.playCoin();
   createOneShotParticles(
     "collectSparkle",
     raft.root.position.add(new BABYLON.Vector3(0, 1.15, 0.15)),
     new BABYLON.Color4(1, 0.92, 0.25, 1),
-    new BABYLON.Color4(0.35, 1, 0.72, 1),
+    new BABYLON.Color4(1, 0.58, 0.08, 0.9),
     { capacity: 90, minSize: 0.1, maxSize: 0.34, minLifeTime: 0.22, maxLifeTime: 0.62, emitRate: 360, duration: 0.07 },
   );
 }
 
+function createRippleEffect(position) {
+  const material = new BABYLON.StandardMaterial("splashRippleMaterial", scene);
+  material.diffuseColor = new BABYLON.Color3(0.82, 0.98, 1);
+  material.emissiveColor = new BABYLON.Color3(0.25, 0.58, 0.66);
+  material.alpha = 0.78;
+  material.specularColor = BABYLON.Color3.Black();
+
+  const rings = [0, 1].map((index) => {
+    const ring = BABYLON.MeshBuilder.CreateTorus(`splashRipple${index}`, {
+      diameter: 1.15 + index * 0.42,
+      thickness: 0.035,
+      tessellation: 42,
+    }, scene);
+    ring.position.copyFrom(position);
+    ring.position.y = 0.075 + index * 0.006;
+    ring.scaling.setAll(0.35 + index * 0.12);
+    ring.material = material;
+    return ring;
+  });
+
+  let age = 0;
+  const lifetime = 0.62;
+  const observer = scene.onBeforeRenderObservable.add(() => {
+    age += Math.min(engine.getDeltaTime() / 1000, 0.033);
+    const t = Math.min(1, age / lifetime);
+    material.alpha = (1 - t) * 0.78;
+    rings.forEach((ring, index) => {
+      ring.scaling.setAll(0.35 + t * (2.15 + index * 0.5));
+    });
+    if (t >= 1) {
+      scene.onBeforeRenderObservable.remove(observer);
+      rings.forEach((ring) => ring.dispose());
+      material.dispose();
+    }
+  });
+}
+
 function createSplashEffect() {
+  audio.playSplash();
+  const splashCenter = raft.root.position.add(new BABYLON.Vector3(0, -0.28, -0.62));
+  createRippleEffect(splashCenter);
+
   createOneShotParticles(
-    "raftSplash",
-    raft.root.position.add(new BABYLON.Vector3(0, -0.28, -0.65)),
-    new BABYLON.Color4(0.72, 0.95, 1, 0.9),
-    new BABYLON.Color4(0.35, 0.72, 1, 0.65),
+    "splashJets",
+    splashCenter,
+    new BABYLON.Color4(0.86, 0.99, 1, 1),
+    new BABYLON.Color4(0.35, 0.78, 1, 0.78),
     {
-      capacity: 110,
-      minEmitBox: new BABYLON.Vector3(-1.1, -0.05, -0.35),
-      maxEmitBox: new BABYLON.Vector3(1.1, 0.05, 0.35),
-      minSize: 0.18,
-      maxSize: 0.58,
+      capacity: 90,
+      minEmitBox: new BABYLON.Vector3(-0.48, -0.02, -0.22),
+      maxEmitBox: new BABYLON.Vector3(0.48, 0.04, 0.22),
+      minSize: 0.12,
+      maxSize: 0.38,
+      minLifeTime: 0.2,
+      maxLifeTime: 0.52,
+      gravity: new BABYLON.Vector3(0, -5.4, 0),
+      direction1: new BABYLON.Vector3(-1.0, 4.0, -0.65),
+      direction2: new BABYLON.Vector3(1.0, 6.9, 0.75),
+      minEmitPower: 1.3,
+      maxEmitPower: 2.6,
+      emitRate: 680,
+      duration: 0.045,
+    },
+  );
+
+  createOneShotParticles(
+    "splashCrown",
+    splashCenter.add(new BABYLON.Vector3(0, 0.05, 0)),
+    new BABYLON.Color4(0.75, 0.96, 1, 0.9),
+    new BABYLON.Color4(0.18, 0.62, 0.92, 0.6),
+    {
+      capacity: 75,
+      minEmitBox: new BABYLON.Vector3(-0.78, -0.02, -0.28),
+      maxEmitBox: new BABYLON.Vector3(0.78, 0.04, 0.28),
+      minSize: 0.08,
+      maxSize: 0.24,
       minLifeTime: 0.18,
       maxLifeTime: 0.42,
-      direction1: new BABYLON.Vector3(-1.7, 1.1, -1.4),
-      direction2: new BABYLON.Vector3(1.7, 2.2, 0.6),
-      emitRate: 420,
-      duration: 0.06,
+      gravity: new BABYLON.Vector3(0, -4.2, 0),
+      direction1: new BABYLON.Vector3(-2.8, 1.5, -1.35),
+      direction2: new BABYLON.Vector3(2.8, 2.8, 1.35),
+      minEmitPower: 1.0,
+      maxEmitPower: 2.4,
+      emitRate: 520,
+      duration: 0.04,
+    },
+  );
+}
+
+function createDuckEffect() {
+  audio.playDuck();
+  createOneShotParticles(
+    "duckSpray",
+    raft.root.position.add(new BABYLON.Vector3(0, 0.18, 0.55)),
+    new BABYLON.Color4(0.65, 0.95, 1, 0.75),
+    new BABYLON.Color4(0.22, 0.55, 0.82, 0.45),
+    {
+      capacity: 80,
+      minEmitBox: new BABYLON.Vector3(-0.8, -0.02, -0.15),
+      maxEmitBox: new BABYLON.Vector3(0.8, 0.12, 0.15),
+      minSize: 0.1,
+      maxSize: 0.34,
+      minLifeTime: 0.16,
+      maxLifeTime: 0.36,
+      direction1: new BABYLON.Vector3(-1.4, 0.8, -2.2),
+      direction2: new BABYLON.Vector3(1.4, 1.4, -0.6),
+      emitRate: 300,
+      duration: 0.045,
+    },
+  );
+}
+
+function createPassEffect() {
+  audio.playPass();
+  createOneShotParticles(
+    "cleanPassSpray",
+    raft.root.position.add(new BABYLON.Vector3(0, 0.28, -0.15)),
+    new BABYLON.Color4(0.78, 1, 0.92, 0.75),
+    new BABYLON.Color4(0.45, 0.85, 1, 0.5),
+    {
+      capacity: 70,
+      minEmitBox: new BABYLON.Vector3(-1.05, -0.04, -0.35),
+      maxEmitBox: new BABYLON.Vector3(1.05, 0.12, 0.35),
+      minSize: 0.08,
+      maxSize: 0.28,
+      minLifeTime: 0.16,
+      maxLifeTime: 0.45,
+      direction1: new BABYLON.Vector3(-1.6, 0.9, -1.8),
+      direction2: new BABYLON.Vector3(1.6, 1.7, -0.4),
+      emitRate: 260,
+      duration: 0.045,
     },
   );
 }
 
 function createCrashEffect() {
+  audio.playCrash();
   createOneShotParticles(
     "crashBurst",
     raft.root.position.add(new BABYLON.Vector3(0, 0.55, 0.1)),
@@ -367,13 +515,17 @@ function checkCollisions() {
     crashed = true;
     phase = "crashed";
     saveHighScore();
+    audio.stopGameplayAudio();
+    audio.playFailMelody();
+    audio.startFailAudio();
     createCrashEffect();
-    ui.showCollision();
+    raft.playCrash();
+    ui.showCollision(mode);
   }
 }
 
 function updateSensors() {
-  const readings = obstacleSystem.readSensors(raft.root.position.x);
+  const readings = mode === "bot" && latestSensorReadings.length ? latestSensorReadings : obstacleSystem.readSensors(raft.root.position.x);
   sensorLines.forEach((line, index) => {
     const reading = readings[index];
     const length = reading.hit ? reading.distance * SENSOR_RANGE : SENSOR_RANGE;
@@ -391,12 +543,18 @@ function updateSensors() {
       radius: 0.025,
       instance: line,
     });
-    line.visibility = mode === "bot" ? 0.8 : 0;
+    line.visibility = mode === "bot" && debugMode ? 0.8 : 0;
   });
+
+  if (debugTargetMarker) {
+    const showTarget = mode === "bot" && debugMode && latestSteeringPlan;
+    debugTargetMarker.visibility = showTarget ? 0.9 : 0;
+    if (showTarget) debugTargetMarker.position.set(latestSteeringPlan.targetX, 0.18, RAFT_Z + 3.6);
+  }
 }
 
 function animateRaft() {
-  const activeVelocity = mode === "bot" ? botVelocityX : mode === "motion" ? motionVelocityX : raftVelocityX;
+  const activeVelocity = mode === "bot" ? botVelocityX : mode === "camera" ? motionVelocityX : raftVelocityX;
   raft.animate({
     distance,
     zState,
@@ -405,6 +563,8 @@ function animateRaft() {
     motionLean: input.motionLean,
     camera,
     fixedCameraTarget,
+    cameraZoom: phase === "countdown" ? 9.2 : mode === "camera" ? 8.6 : 16.5,
+    introPose: phase === "countdown",
   });
 }
 
@@ -425,9 +585,11 @@ function keepRaftInRiver() {
   }
 }
 
+let welcomeAccepted = false;
+
 function updateHtmlMenu() {
   const menu = document.getElementById("htmlMenu");
-  menu?.classList.toggle("hidden", !(phase === "menu" || phase === "paused"));
+  menu?.classList.toggle("hidden", !welcomeAccepted || !(phase === "menu" || phase === "paused"));
   const subtitle = document.getElementById("menuSubtitle");
   if (subtitle) {
     subtitle.textContent = phase === "paused"
@@ -436,7 +598,6 @@ function updateHtmlMenu() {
         ? `${poseInput.state.status}. Clap when ready to calibrate and start.`
         : "Choose your rider and jump into the river.";
   }
-  document.getElementById("menuProfile").textContent = profile;
   document.getElementById("menuBest").textContent = `Best ${getHighScore()}`;
   document.querySelectorAll<HTMLButtonElement>("[data-profile]").forEach((button) => {
     button.classList.toggle("active", button.dataset.profile === profile);
@@ -446,8 +607,47 @@ function updateHtmlMenu() {
   });
 }
 
+function updateDebugPanel() {
+  const panel = document.getElementById("steeringDebug");
+  if (!panel) return;
+  const visible = debugMode && mode === "bot";
+  panel.classList.toggle("hidden", !visible);
+  if (!visible) return;
+
+  const plan = latestSteeringPlan;
+  const sensorSummary = latestSensorReadings
+    .map((reading, index) => `${index}:${reading.hit ? reading.type[0] : "-"}${Math.round(reading.distance * 100)}`)
+    .join("  ");
+  const action = plan?.shouldJump ? "JUMP" : plan?.shouldDuck ? "DUCK" : "none";
+  const threat = plan?.nearestThreat ? `${plan.nearestThreat.type} x=${plan.nearestThreat.x.toFixed(1)} z=${plan.nearestThreat.z.toFixed(1)}` : "none";
+  const behaviors = botVehicle?.behaviors
+    ? [...botVehicle.behaviors.behaviors.entries()].map(([name, behavior]) => `${behavior.enabled ? "✓" : "×"} ${name} w=${behavior.weight}`).join("\n")
+    : "";
+
+  panel.textContent = [
+    "[DEBUG MODE ON]",
+    `mode: ${mode}  phase: ${phase}`,
+    `raft x: ${raft.root.position.x.toFixed(2)}  vx: ${botVelocityX.toFixed(2)}`,
+    `plan: ${plan?.activeBehavior ?? "none"}  targetX: ${plan?.targetX.toFixed(2) ?? "-"}`,
+    `threat: ${threat}`,
+    `action: ${action}  zState: ${zState}`,
+    `sensors: ${sensorSummary}`,
+    "behaviors:",
+    behaviors,
+    "",
+    "H: toggle debug/hitboxes",
+  ].join("\n");
+}
+
+function toggleDebugMode() {
+  debugMode = !debugMode;
+  obstacleSystem?.toggleHitboxes();
+  if (!debugMode && debugTargetMarker) debugTargetMarker.visibility = 0;
+}
+
 function updateUi() {
   updateHtmlMenu();
+  updateDebugPanel();
   const readings = obstacleSystem.readSensors(raft.root.position.x);
   const hasThreat = readings.some((reading) => reading.hit && reading.distance < 0.72);
   const needsZ = readings.some((reading) => reading.hit && Math.abs(reading.angle) < 0.25 && reading.distance < 0.46);
@@ -469,7 +669,9 @@ function updateUi() {
 }
 
 function setMode(nextMode: string) {
-  mode = nextMode;
+  mode = nextMode === "motion" ? "keyboard" : nextMode;
+  latestSteeringPlan = null;
+  latestSensorReadings = [];
   botVelocityX = raftVelocityX;
   motionVelocityX = raftVelocityX;
   if (mode === "camera") poseInput.start();
@@ -479,8 +681,6 @@ function setMode(nextMode: string) {
 }
 
 function getProfileColor(profileName = profile) {
-  if (profileName === "Player 1") return new BABYLON.Color3(0.35, 0.78, 1.0);
-  if (profileName === "Player 2") return new BABYLON.Color3(1.0, 0.42, 0.52);
   return new BABYLON.Color3(0.19, 0.84, 0.67);
 }
 
@@ -526,7 +726,9 @@ function resetRun() {
 }
 
 function restart() {
+  audio.startGameplayAudio();
   resetRun();
+  raft.playIntro();
   phase = "countdown";
   countdown = 3;
   ui.closeSettings();
@@ -534,6 +736,7 @@ function restart() {
 }
 
 function startGame() {
+  audio.init();
   if (phase === "paused") {
     phase = "playing";
     updateUi();
@@ -560,6 +763,7 @@ function togglePauseMenu() {
 
 function backToMenu() {
   saveHighScore();
+  audio.startMenuAudio();
   phase = "menu";
   crashed = false;
   obstacleSystem?.clear();
@@ -569,6 +773,17 @@ function backToMenu() {
 
 function bindHtmlMenu() {
   document.getElementById("playButton")?.addEventListener("click", startGame);
+  const acceptWelcome = () => {
+    if (welcomeAccepted) return;
+    welcomeAccepted = true;
+    document.getElementById("welcomeScreen")?.classList.add("hidden");
+    audio.startMenuAudio();
+    updateUi();
+  };
+  document.getElementById("welcomeStartButton")?.addEventListener("click", acceptWelcome);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") acceptWelcome();
+  });
   document.getElementById("restartMenuButton")?.addEventListener("click", restart);
   document.querySelectorAll<HTMLButtonElement>("[data-profile]").forEach((button) => {
     button.addEventListener("click", () => setProfile(button.dataset.profile));
@@ -586,8 +801,9 @@ input = new InputController({
   restart,
   jump: () => startZAction("JUMPING"),
   duck: () => startZAction("DUCKING"),
-  toggleHitboxes: () => obstacleSystem?.toggleHitboxes(),
+  toggleHitboxes: () => toggleDebugMode(),
   toggleMenu: togglePauseMenu,
+  toggleMute: () => audio.toggleMuted(),
 });
 
 createScene().then((createdScene) => {

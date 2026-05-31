@@ -42,26 +42,50 @@ export class World {
         this.scene.meshes.forEach((mesh) => {
             if (!mesh.metadata || mesh.metadata.baseZ === undefined)
                 return;
-            mesh.position.z = ((mesh.metadata.baseZ - this.riverOffset + 22) % 44) - 20;
-            // Add a slight "bobbing" to foam
+            const wrappedZ = ((mesh.metadata.baseZ - this.riverOffset + 22) % 44 + 44) % 44;
+            mesh.position.z = wrappedZ - 20;
             if (mesh.metadata.flow) {
-                mesh.position.y = 0.052 + Math.sin(this.riverOffset * 0.8 + mesh.metadata.baseZ) * 0.015;
+                const sway = mesh.metadata.sway ?? 0;
+                const phase = mesh.metadata.phase ?? mesh.metadata.baseZ;
+                mesh.position.y = (mesh.metadata.baseY ?? 0.052) + Math.sin(this.riverOffset * 0.8 + phase) * (mesh.metadata.bob ?? 0.015);
+                if (mesh.metadata.baseX !== undefined)
+                    mesh.position.x = mesh.metadata.baseX + Math.sin(this.riverOffset * 0.45 + phase) * sway;
+                if (mesh.metadata.spin)
+                    mesh.rotation.y += dt * mesh.metadata.spin;
             }
         });
     }
     createFoam() {
-        for (let i = 0; i < 42; i += 1) {
+        for (let i = 0; i < 54; i += 1) {
             const foam = BABYLON.MeshBuilder.CreateBox(`foam${i}`, {
-                width: i % 3 === 0 ? 2.4 : 1.2,
+                width: i % 4 === 0 ? 2.6 : 0.75 + Math.random() * 1.15,
                 height: 0.01,
-                depth: 0.08,
+                depth: 0.045 + Math.random() * 0.075,
             }, this.scene);
-            const x = (Math.random() - 0.5) * RIVER_HALF_WIDTH * 1.8;
-            const z = -20 + i * 1.05;
+            const x = (Math.random() - 0.5) * RIVER_HALF_WIDTH * 1.72;
+            const z = -21 + i * 0.82;
             foam.position.set(x, 0.052, z);
-            foam.rotation.y = Math.random() * Math.PI;
-            foam.material = this.materials.foam;
-            foam.metadata = { baseZ: z, speed: 7, flow: true };
+            foam.rotation.y = (Math.random() - 0.5) * 0.7;
+            foam.material = i % 3 === 0 ? this.materials.foamSoft : this.materials.foam;
+            foam.metadata = { baseX: x, baseZ: z, baseY: 0.052, speed: 7, flow: true, sway: 0.08 + Math.random() * 0.16, bob: 0.012, phase: i * 0.73 };
+            foam.setEnabled(false);
+        }
+        this.createFloatingLeaves();
+    }
+    createFloatingLeaves() {
+        for (let i = 0; i < 24; i += 1) {
+            const leaf = BABYLON.MeshBuilder.CreateDisc(`floatingLeaf${i}`, {
+                radius: 0.08 + Math.random() * 0.045,
+                tessellation: 7,
+            }, this.scene);
+            const x = (Math.random() - 0.5) * RIVER_HALF_WIDTH * 1.45;
+            const z = -21 + i * 1.85;
+            leaf.position.set(x, 0.064, z);
+            leaf.rotation.x = Math.PI / 2;
+            leaf.rotation.y = Math.random() * Math.PI;
+            leaf.scaling.x = 1.6;
+            leaf.material = this.materials.floatingLeaf;
+            leaf.metadata = { baseX: x, baseZ: z, baseY: 0.064, speed: 7, flow: true, sway: 0.18 + Math.random() * 0.2, bob: 0.008, spin: (Math.random() - 0.5) * 1.6, phase: i * 0.59 };
         }
     }
     createBankEdges() {

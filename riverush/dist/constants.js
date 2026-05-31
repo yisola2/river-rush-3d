@@ -5,6 +5,7 @@ export const SPAWN_Z = 24;
 export const DESPAWN_Z = -19;
 export const PLAYER_RADIUS = 0.72;
 export const SENSOR_RANGE = 17;
+export const JUMP_DURATION = 1.25;
 export const LANES = [-3.5, -1.75, 0, 1.75, 3.5];
 export const RAY_ANGLES = [-0.42, -0.22, 0, 0.22, 0.42];
 export const OBSTACLE_TYPES = {

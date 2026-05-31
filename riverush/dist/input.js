@@ -25,6 +25,9 @@ export class InputController {
     isLeanRightPressed() {
         return this.keys.has("arrowright") || this.keys.has("d") || this.keyCodes.has("KeyD");
     }
+    isDuckPressed() {
+        return this.keys.has("s") || this.keys.has("arrowdown") || this.keyCodes.has("KeyS");
+    }
     resetMotion() {
         this.motionLean = 0;
     }
@@ -35,8 +38,6 @@ export class InputController {
             event.preventDefault();
         }
         const key = event.key.toLowerCase();
-        if (key === "m")
-            this.callbacks.setMode(this.callbacks.getMode() === "motion" ? "keyboard" : "motion");
         if (key === "b")
             this.callbacks.setMode(this.callbacks.getMode() === "bot" ? "keyboard" : "bot");
         if (key === "c")
@@ -45,12 +46,14 @@ export class InputController {
             this.callbacks.restart();
         if (key === "h")
             this.callbacks.toggleHitboxes();
+        if (key === "m")
+            this.callbacks.toggleMute();
         if (event.key === "Escape")
             this.callbacks.toggleMenu();
         if (this.isJumpKey(event))
             this.callbacks.jump();
-        if (this.isDuckKey(event))
-            this.callbacks.duck();
+        // Physical keyboard ducking is polled as a held state in the game loop.
+        // Pointer/motion swipe ducking still uses a timed duck intent.
     }
     handleKeyUp(event) {
         this.keys.delete(event.key.toLowerCase());
@@ -64,8 +67,6 @@ export class InputController {
         this.pointer.y = event.clientY;
         this.pointer.lastTime = performance.now();
         this.updateMotionLean(event.clientX);
-        if (this.callbacks.getMode() === "keyboard")
-            this.callbacks.setMode("motion");
     }
     handlePointerMove(event) {
         this.updateMotionLean(event.clientX);
@@ -73,12 +74,8 @@ export class InputController {
         const dy = event.clientY - this.pointer.lastY;
         const elapsed = Math.max(16, now - this.pointer.lastTime);
         const velocityY = dy / elapsed;
-        if (this.callbacks.getMode() === "motion" && this.pointer.active) {
-            if (velocityY < -0.9)
-                this.callbacks.jump();
-            if (velocityY > 0.9)
-                this.callbacks.duck();
-        }
+        // Touch/pointer mode is intentionally hidden for now; keep lean tracking
+        // available for a future explicit Touch mode, but do not switch modes here.
         this.pointer.y = event.clientY;
         this.pointer.lastY = event.clientY;
         this.pointer.lastTime = now;

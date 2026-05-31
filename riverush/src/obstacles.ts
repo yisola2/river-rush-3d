@@ -370,22 +370,27 @@ export class ObstacleSystem {
     const group = new BABYLON.TransformNode(`starGroup${this.serial}`, this.scene);
     group.parent = root;
 
-    const ring = BABYLON.MeshBuilder.CreateTorus(`starRing${this.serial}`, {
-      diameter: 0.62,
-      thickness: 0.065,
-      tessellation: 18,
+    const coin = BABYLON.MeshBuilder.CreateCylinder(`coin${this.serial}`, {
+      diameter: 0.46,
+      height: 0.09,
+      tessellation: 28,
     }, this.scene);
-    ring.position.y = 0.9;
-    ring.rotation.x = Math.PI / 2;
-    ring.parent = group;
-    ring.material = this.materials.star;
+    coin.position.y = 0.86;
+    coin.rotation.x = Math.PI / 2;
+    coin.parent = group;
+    coin.material = this.materials.star;
 
-    const core = BABYLON.MeshBuilder.CreatePolyhedron(`starCore${this.serial}`, { type: 1, size: 0.24 }, this.scene);
-    core.position.y = 0.9;
-    core.parent = group;
-    core.material = this.materials.star;
+    const rim = BABYLON.MeshBuilder.CreateTorus(`coinRim${this.serial}`, {
+      diameter: 0.48,
+      thickness: 0.035,
+      tessellation: 28,
+    }, this.scene);
+    rim.position.y = 0.86;
+    rim.rotation.x = Math.PI / 2;
+    rim.parent = group;
+    rim.material = this.materials.gate;
 
-    return { mesh: group, radius: 0.44, escapeActions: [] };
+    return { mesh: group, radius: 0.34, escapeActions: [] };
   }
 
   private createJumpGate(root) {

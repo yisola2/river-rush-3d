@@ -14,7 +14,20 @@
   <body>
     <canvas id="gameCanvas"></canvas>
 
-    <div id="htmlMenu" class="menu-overlay">
+    <div id="steeringDebug" class="steering-debug hidden" aria-live="polite"></div>
+
+    <div id="welcomeScreen" class="welcome-overlay">
+      <div class="welcome-card">
+        <p class="eyebrow">Welcome to the rapids</p>
+        <h1>River Rush 3D</h1>
+        <img class="welcome-avatar" src="./assets/images/sporty-nanny.png" alt="Sporty nanny River Queen avatar" />
+        <p>Warm up, pick your controls, and ride the river.</p>
+        <button id="welcomeStartButton" class="craft-button primary">Start Adventure</button>
+        <small>Click to enable sound · Jazz menu on</small>
+      </div>
+    </div>
+
+    <div id="htmlMenu" class="menu-overlay hidden">
       <div class="menu-band menu-band-top"></div>
       <div class="menu-band menu-band-bottom"></div>
       <div class="leaf leaf-a"></div>
@@ -35,19 +48,10 @@
 
         <section class="stone-card">
           <span class="card-kicker">02</span>
-          <h2>Rider</h2>
-          <p>Local profile and best score.</p>
-          <div class="choice-stack" data-choice-group="profile">
-            <button class="chip-button" data-profile="Guest">Guest</button>
-            <button class="chip-button" data-profile="Player 1">Player 1</button>
-            <button class="chip-button" data-profile="Player 2">Player 2</button>
-          </div>
-          <div class="rider-preview" aria-hidden="true">
-            <span class="rider-head"></span>
-            <span class="rider-body"></span>
-            <span class="rider-raft"></span>
-          </div>
-          <div class="profile-badge"><span id="menuProfile">Guest</span><strong id="menuBest">Best 0</strong></div>
+          <h2>River Queen</h2>
+          <p>Your coach for the rapids and local record keeper.</p>
+          <img class="menu-avatar" src="./assets/images/sporty-nanny-card.png" alt="River Queen avatar" />
+          <div class="profile-badge"><span>Record</span><strong id="menuBest">Best 0</strong></div>
         </section>
 
         <section class="stone-card">
@@ -56,9 +60,8 @@
           <p>Pick a control style for this run.</p>
           <div class="choice-stack" data-choice-group="mode">
             <button class="chip-button" data-mode="keyboard">Keyboard</button>
-            <button class="chip-button" data-mode="motion">Motion</button>
-            <button class="chip-button" data-mode="bot">Bot</button>
             <button class="chip-button" data-mode="camera">Camera</button>
+            <button class="chip-button" data-mode="bot">Bot</button>
           </div>
           <p class="tiny-help">Q/A/D lean · Space jump · S duck · C camera</p>
         </section>

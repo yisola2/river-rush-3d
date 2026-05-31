@@ -1,4 +1,4 @@
-import { RAFT_Z } from "./constants.js";
+import { JUMP_DURATION, RAFT_Z } from "./constants.js";
 
 declare const BABYLON: any;
 
@@ -13,6 +13,9 @@ export class Raft {
   animationGroups = new Map<string, any>();
   private activeAnimation = "";
   private lastZState = "NORMAL";
+  private specialAnimation = "";
+  private introPlaying = false;
+  private animationSerial = 0;
 
   constructor(private scene, private materials) {}
 
@@ -25,7 +28,6 @@ export class Raft {
 
     this.createLogDeck();
     this.createRider();
-    this.createWake();
   }
 
   async loadModel() {
@@ -80,14 +82,15 @@ export class Raft {
     this.root.position.set(0, 0.42, RAFT_Z);
     this.body.rotation.set(0, 0, 0);
     this.body.scaling.set(1, 1, 1);
-    if (this.wake) {
-      this.wake.emitRate = 120;
-    }
+    this.specialAnimation = "";
+    this.introPlaying = false;
+    this.lastZState = "NORMAL";
+    this.playAnimation("idle", true);
   }
 
-  animate({ distance, zState, zTimer, activeVelocity, motionLean, camera, fixedCameraTarget }) {
+  animate({ distance, zState, zTimer, activeVelocity, motionLean, camera, fixedCameraTarget, cameraZoom, introPose }) {
     this.updateModelAnimation(zState);
-    const jumpProgress = zState === "JUMPING" ? Math.sin((zTimer / 0.66) * Math.PI) : 0;
+    const jumpProgress = zState === "JUMPING" ? Math.sin((zTimer / JUMP_DURATION) * Math.PI) : 0;
     this.root.position.y = 0.42 + jumpProgress * 1.65;
     this.body.scaling.y = zState === "DUCKING" ? 0.58 : 1;
     this.body.rotation.z = BABYLON.Scalar.Lerp(this.body.rotation.z, -activeVelocity * 0.065 - motionLean * 0.18, 0.12);
@@ -99,77 +102,96 @@ export class Raft {
     this.rightArm.rotation.z = BABYLON.Scalar.Lerp(this.rightArm.rotation.z, zState === "JUMPING" ? 2.2 : 0.45 - motionLean * 0.4, 0.18);
     this.leftArm.rotation.x = zState === "DUCKING" ? 0.9 : 0.1;
     this.rightArm.rotation.x = zState === "DUCKING" ? 0.9 : 0.1;
+    if (introPose) {
+      this.body.rotation.y = BABYLON.Scalar.Lerp(this.body.rotation.y, 0.34, 0.08);
+      this.body.position.y = Math.sin(distance * 1.8) * 0.035;
+    } else {
+      this.body.rotation.y = BABYLON.Scalar.Lerp(this.body.rotation.y, 0, 0.08);
+      this.body.position.y = BABYLON.Scalar.Lerp(this.body.position.y, 0, 0.12);
+    }
+    camera.radius = BABYLON.Scalar.Lerp(camera.radius, cameraZoom ?? 16.5, 0.06);
     camera.setTarget(fixedCameraTarget);
 
-    if (this.wake) {
-      const isVisible = zState !== "JUMPING" || jumpProgress < 0.1;
-      if (isVisible) {
-        this.wake.emitRate = 120 + Math.abs(activeVelocity) * 15;
-      } else {
-        this.wake.emitRate = 0;
-      }
-    }
+  }
+
+  playIntro() {
+    if (!this.modelRoot || this.introPlaying) return;
+    this.introPlaying = true;
+    this.specialAnimation = "intro";
+    this.playAnimation("intro", false, 1.15, () => {
+      this.introPlaying = false;
+      this.specialAnimation = "";
+      this.lastZState = "";
+    });
+  }
+
+  playCrash() {
+    if (!this.modelRoot) return;
+    this.specialAnimation = "fall";
+    this.playAnimation("fall", false, 1.35, undefined, 10);
+  }
+
+  playVictory() {
+    if (!this.modelRoot || this.specialAnimation === "fall") return;
+    this.specialAnimation = "victory";
+    this.playAnimation("victory", false, 1.15, () => {
+      this.specialAnimation = "";
+      this.lastZState = "";
+    });
   }
 
   private updateModelAnimation(zState: string) {
-    if (!this.modelRoot || zState === this.lastZState) return;
+    if (!this.modelRoot || this.specialAnimation || zState === this.lastZState) return;
+    const previousState = this.lastZState;
     this.lastZState = zState;
     if (zState === "JUMPING") {
-      this.playAnimation("jump", false, 1.85, () => this.playAnimation("idle", true));
+      this.playAnimation("jump", false, this.getAnimationSpeedForDuration("jump", JUMP_DURATION));
       return;
     }
     if (zState === "DUCKING") {
-      this.playAnimation("crouch_idle", true);
+      this.playAnimation("stand_to_crouch", false, 1.6, () => {
+        if (this.lastZState === "DUCKING" && !this.specialAnimation) this.playAnimation("crouch_idle", true);
+      });
       return;
     }
-    // Do not cut the non-looping jump animation the moment gameplay returns
-    // to NORMAL; let its onEnd callback blend back to idle.
-    if (this.activeAnimation.startsWith("jump:")) return;
+    if (previousState === "DUCKING") {
+      this.playAnimation("crouch_to_stand", false, 1.45, () => this.playAnimation("idle", true));
+      return;
+    }
     this.playAnimation("idle", true);
   }
 
-  private playAnimation(name: string, loop: boolean, speed = 1, onEnd?: () => void) {
+  private findAnimationGroup(name: string) {
     const key = name.toLowerCase();
-    const group = this.animationGroups.get(key) ?? [...this.animationGroups.entries()].find(([groupName]) => groupName.includes(key))?.[1];
-    if (!group || this.activeAnimation === `${name}:${loop}`) return;
+    return this.animationGroups.get(key) ?? [...this.animationGroups.entries()].find(([groupName]) => groupName.includes(key))?.[1];
+  }
+
+  private getAnimationSpeedForDuration(name: string, targetDuration: number) {
+    const group = this.findAnimationGroup(name);
+    const firstAnimation = group?.targetedAnimations?.[0]?.animation;
+    const framesPerSecond = firstAnimation?.framePerSecond || 30;
+    const frameDuration = group && Number.isFinite(group.to - group.from) ? Math.abs(group.to - group.from) / framesPerSecond : 0;
+    return frameDuration > 0 ? frameDuration / targetDuration : 1;
+  }
+
+  private playAnimation(name: string, loop: boolean, speed = 1, onEnd?: () => void, startOffsetFrames = 0) {
+    const group = this.findAnimationGroup(name);
+    const activeKey = `${name}:${loop}:${startOffsetFrames}`;
+    if (!group || this.activeAnimation === activeKey) return;
+    this.animationSerial += 1;
+    const serial = this.animationSerial;
     for (const anim of this.animationGroups.values()) anim.stop();
-    this.activeAnimation = `${name}:${loop}`;
+    this.activeAnimation = activeKey;
     group.speedRatio = speed;
     group.reset();
-    group.start(loop);
+    const fromFrame = startOffsetFrames > 0 ? Math.min(group.to, group.from + startOffsetFrames) : undefined;
+    group.start(loop, speed, fromFrame);
     if (onEnd) {
       const observer = group.onAnimationGroupEndObservable.add(() => {
         group.onAnimationGroupEndObservable.remove(observer);
-        onEnd();
+        if (serial === this.animationSerial) onEnd();
       });
     }
-  }
-
-  private createWake() {
-    // Create a particle system for a dynamic splashing wake
-    this.wake = new BABYLON.ParticleSystem("wakeParticles", 200, this.scene);
-    this.wake.particleTexture = new BABYLON.Texture("https://playground.babylonjs.com/textures/flare.png", this.scene);
-    this.wake.emitter = this.root;
-    this.wake.minEmitBox = new BABYLON.Vector3(-1.2, -0.4, -1.8);
-    this.wake.maxEmitBox = new BABYLON.Vector3(1.2, -0.2, -1.2);
-    this.wake.color1 = new BABYLON.Color4(0.9, 0.95, 1.0, 0.8);
-    this.wake.color2 = new BABYLON.Color4(0.8, 0.9, 1.0, 0.5);
-    this.wake.colorDead = new BABYLON.Color4(0.6, 0.8, 0.9, 0.0);
-    this.wake.minSize = 0.3;
-    this.wake.maxSize = 0.8;
-    this.wake.minLifeTime = 0.4;
-    this.wake.maxLifeTime = 0.8;
-    this.wake.emitRate = 120;
-    this.wake.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
-    this.wake.gravity = new BABYLON.Vector3(0, -2.5, 0);
-    this.wake.direction1 = new BABYLON.Vector3(-0.5, 0.8, -1.5);
-    this.wake.direction2 = new BABYLON.Vector3(0.5, 1.5, -2.5);
-    this.wake.minAngularSpeed = 0;
-    this.wake.maxAngularSpeed = Math.PI;
-    this.wake.minEmitPower = 1.0;
-    this.wake.maxEmitPower = 3.0;
-    this.wake.updateSpeed = 0.015;
-    this.wake.start();
   }
 
   private createLogDeck() {

@@ -3,23 +3,29 @@ declare const BABYLON: any;
 export function createGameMaterials(scene) {
   const materials: Record<string, any> = {};
 
-  materials.water = new BABYLON.WaterMaterial("water", scene, new BABYLON.Vector2(1024, 1024));
-  materials.water.backFaceCulling = false;
-  materials.water.bumpTexture = createWaterBumpTexture(scene);
-  materials.water.waterColor = new BABYLON.Color3(0.04, 0.32, 0.43);
-  materials.water.colorBlendFactor = 0.38;
-  materials.water.bumpHeight = 0.08;
-  materials.water.waveHeight = 0.12;
-  materials.water.waveLength = 0.16;
-  materials.water.waveSpeed = 0.6;
-  materials.water.windForce = -6;
-  materials.water.windDirection = new BABYLON.Vector2(0, 1);
-  materials.water.specularPower = 48;
+  materials.water = createStylizedRiverMaterial(scene);
 
   materials.foam = new BABYLON.StandardMaterial("foam", scene);
   materials.foam.diffuseColor = new BABYLON.Color3(0.85, 0.98, 1);
   materials.foam.emissiveColor = new BABYLON.Color3(0.1, 0.2, 0.25);
   materials.foam.alpha = 0.85;
+
+  materials.foamSoft = new BABYLON.StandardMaterial("foamSoft", scene);
+  materials.foamSoft.diffuseColor = new BABYLON.Color3(0.72, 0.94, 1);
+  materials.foamSoft.emissiveColor = new BABYLON.Color3(0.06, 0.15, 0.2);
+  materials.foamSoft.alpha = 0.42;
+  materials.foamSoft.specularColor = BABYLON.Color3.Black();
+
+  materials.foamBright = new BABYLON.StandardMaterial("foamBright", scene);
+  materials.foamBright.diffuseColor = new BABYLON.Color3(0.9, 1, 1);
+  materials.foamBright.emissiveColor = new BABYLON.Color3(0.32, 0.58, 0.62);
+  materials.foamBright.alpha = 0.72;
+  materials.foamBright.specularColor = BABYLON.Color3.Black();
+
+  materials.floatingLeaf = new BABYLON.StandardMaterial("floatingLeaf", scene);
+  materials.floatingLeaf.diffuseColor = new BABYLON.Color3(0.42, 0.62, 0.16);
+  materials.floatingLeaf.emissiveColor = new BABYLON.Color3(0.04, 0.08, 0.01);
+  materials.floatingLeaf.specularColor = BABYLON.Color3.Black();
 
   materials.wake = new BABYLON.StandardMaterial("wake", scene);
   materials.wake.diffuseColor = new BABYLON.Color3(0.9, 0.95, 1);
@@ -72,6 +78,87 @@ export function createGameMaterials(scene) {
   materials.sensor.emissiveColor = new BABYLON.Color3(0.55, 0.38, 0.02);
 
   return materials;
+}
+
+function createStylizedRiverMaterial(scene) {
+  BABYLON.Effect.ShadersStore.riverRushWaterVertexShader = `
+    precision highp float;
+    attribute vec3 position;
+    attribute vec2 uv;
+    uniform mat4 worldViewProjection;
+    varying vec2 vUV;
+    varying vec3 vPosition;
+    void main(void) {
+      vUV = uv;
+      vPosition = position;
+      gl_Position = worldViewProjection * vec4(position, 1.0);
+    }
+  `;
+
+  BABYLON.Effect.ShadersStore.riverRushWaterFragmentShader = `
+    precision highp float;
+    varying vec2 vUV;
+    varying vec3 vPosition;
+    uniform float time;
+
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+        u.y
+      );
+    }
+
+    void main(void) {
+      vec2 uv = vUV;
+      float downstream = uv.y + time * 0.42;
+      float cross = uv.x;
+
+      vec3 deep = vec3(0.025, 0.18, 0.25);
+      vec3 mid = vec3(0.035, 0.34, 0.43);
+      vec3 light = vec3(0.15, 0.58, 0.62);
+      vec3 foam = vec3(0.78, 0.96, 0.95);
+
+      float center = 1.0 - abs(cross - 0.5) * 2.0;
+      float bankFoam = smoothstep(0.0, 0.13, abs(cross - 0.5) * 2.0 - 0.72);
+
+      float n1 = noise(vec2(cross * 7.0, downstream * 18.0));
+      float n2 = noise(vec2(cross * 18.0 + time * 0.28, downstream * 32.0));
+      float bands = smoothstep(0.82, 0.97, sin((downstream + n1 * 0.09) * 58.0) * 0.5 + 0.5);
+      float streaks = smoothstep(0.70, 0.92, n2) * bands;
+      float centerHighlights = streaks * smoothstep(0.15, 0.85, center) * 0.48;
+
+      vec3 color = mix(deep, mid, center * 0.72 + n1 * 0.18);
+      color = mix(color, light, centerHighlights);
+      color = mix(color, foam, bankFoam * (0.35 + 0.45 * bands));
+
+      float glint = pow(max(0.0, sin((uv.x * 18.0 + downstream * 26.0) + n2 * 2.0)), 18.0) * 0.16;
+      color += glint;
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  const material = new BABYLON.ShaderMaterial("stylizedRiver", scene, {
+    vertex: "riverRushWater",
+    fragment: "riverRushWater",
+  }, {
+    attributes: ["position", "uv"],
+    uniforms: ["worldViewProjection", "time"],
+  });
+  material.backFaceCulling = false;
+  material.setFloat("time", 0);
+  scene.onBeforeRenderObservable.add(() => {
+    material.setFloat("time", performance.now() * 0.001);
+  });
+  return material;
 }
 
 function createWaterBumpTexture(scene) {
