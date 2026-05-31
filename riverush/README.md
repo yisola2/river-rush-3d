@@ -6,7 +6,7 @@ Le jeu a été développé avec **Babylon.js** et **TypeScript**, avec une atten
 
 J’ai choisi cette idée parce qu’elle me rappelle beaucoup mon enfance : les heures passées sur les jeux de la **Wii** et sur **Kinect** avec la Xbox 360. Je voulais retrouver ce côté jeu physique, immédiat, un peu chaotique, où le corps devient la manette.
 
-> Équipe : **Yassin Es Saim** — Master 2 IA, Université Côte d’Azur
+> Équipe : **Yassin Es Saim** — Master MIAGE IA2, Université Côte d’Azur
 
 ---
 
