@@ -14,7 +14,7 @@ J’ai choisi cette idée parce qu’elle me rappelle beaucoup mon enfance : les
 
 Liens à compléter après déploiement :
 
-- Version web : `à compléter`
+- Version web : https://yisola2.itch.io/river-rush-3d
 - Vidéo YouTube : https://youtu.be/ggPOP_gAf3U
 
 Le jeu fonctionne directement dans un navigateur moderne. Aucun gamepad n’est nécessaire.

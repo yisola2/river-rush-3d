@@ -12,8 +12,7 @@ riverush/
 
 ## Liens
 
-- Jeu web : `à compléter`
-- Itch.io : `à compléter`
+- Itch.io : https://yisola2.itch.io/river-rush-3d
 - Vidéo YouTube : https://youtu.be/ggPOP_gAf3U
 
 ## Lancer en local
